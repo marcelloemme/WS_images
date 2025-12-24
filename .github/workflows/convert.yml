@@ -1,0 +1,42 @@
+name: Convert Images for E-Paper
+
+on:
+  push:
+    paths:
+      - 'input/**'
+  workflow_dispatch:
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install pillow numpy
+      
+      - name: Convert images
+        run: |
+          mkdir -p output
+          for img in input/*.{jpg,jpeg,png,JPG,JPEG,PNG}; do
+            if [ -f "$img" ]; then
+              filename=$(basename "$img")
+              name="${filename%.*}"
+              echo "Converting: $img"
+              python convert_for_epaper.py "$img" "output/${name}.bmp"
+            fi
+          done
+      
+      - name: Commit converted images
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add output/
+          git diff --staged --quiet || git commit -m "🖼️ Auto-converted images for e-paper"
+          git push
