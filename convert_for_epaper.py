@@ -9,7 +9,8 @@ Usage as GitHub Action:
 
 import sys
 import numpy as np
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ExifTags
+from PIL.ImageOps import exif_transpose
 from pathlib import Path
 
 # 7-color palette (theoretical RGB values for BMP output)
@@ -88,6 +89,10 @@ def convert(input_path, output_path, width=800, height=480, saturation=1.5):
     """Convert image for e-paper display."""
     # Load and process
     img = Image.open(input_path)
+    
+    # IMPORTANT: Apply EXIF rotation to fix iPhone vertical photos
+    img = exif_transpose(img)
+    
     img = resize_crop(img, width, height)
     img = enhance(img, saturation)
     
