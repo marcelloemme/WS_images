@@ -12,6 +12,8 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -21,22 +23,36 @@ jobs:
       - name: Install dependencies
         run: pip install pillow numpy
       
-      - name: Convert images
+      - name: Process new image
         run: |
-          mkdir -p output
-          for img in input/*.{jpg,jpeg,png,JPG,JPEG,PNG}; do
-            if [ -f "$img" ]; then
-              filename=$(basename "$img")
-              name="${filename%.*}"
-              echo "Converting: $img"
-              python convert_for_epaper.py "$img" "output/${name}.bmp"
-            fi
-          done
+          mkdir -p image output
+          
+          # Trova solo i file nuovi in questo commit
+          NEW_FILES=$(git diff --name-only --diff-filter=A HEAD~1 HEAD -- 'input/*.jpg' 'input/*.jpeg' 'input/*.png' 'input/*.JPG' 'input/*.JPEG' 'input/*.PNG' 2>/dev/null || echo "")
+          
+          if [ -z "$NEW_FILES" ]; then
+            echo "Nessun nuovo file in input/"
+            exit 0
+          fi
+          
+          # Prendi solo l'ultimo file nuovo
+          LATEST=$(echo "$NEW_FILES" | tail -1)
+          echo "Nuovo file: $LATEST"
+          
+          # Se esiste già un bmp in /image, spostalo in /output
+          if ls image/*.bmp 1> /dev/null 2>&1; then
+            echo "Sposto vecchio BMP in output/"
+            mv image/*.bmp output/
+          fi
+          
+          # Converti il nuovo file
+          FILENAME=$(basename "$LATEST" | sed 's/\.[^.]*$//')
+          python convert_for_epaper.py "$LATEST" "image/${FILENAME}.bmp"
       
-      - name: Commit converted images
+      - name: Commit changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add output/
-          git diff --staged --quiet || git commit -m "🖼️ Auto-converted images for e-paper"
+          git add image/ output/
+          git diff --staged --quiet || git commit -m "🖼️ Nuovo BMP: $(ls image/*.bmp 2>/dev/null | head -1 | xargs basename)"
           git push
